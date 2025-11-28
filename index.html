@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SammieQuiz Ultimate - Een interactieve quiz applicatie voor vrienden en familie.">
+    <title>SammieQuiz Ultimate</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@300;500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="vragen.js"></script>
+    <script src="app.js" defer></script>
+</head>
+
+<body>
+
+    <div id="app">
+        <div class="cosmic-bg">
+            <div class="orb orb-1"></div>
+            <div class="orb orb-2"></div>
+            <div class="orb orb-3"></div>
+        </div>
+
+        <!-- =====================
+         1. SIDEBAR (LINKS)
+         ===================== -->
+        <aside class="sidebar">
+            <div class="brand">
+                <img src="assets/sammie.png" alt="sammie" style="width: 40px;">
+                <span>SammieQuiz</span>
+            </div>
+
+            <div class="players-container">
+                <div v-if="players.length === 0"
+                    style="text-align: center; color: var(--text-muted); margin-top: 40px;">
+                    Nog geen spelers...
+                </div>
+
+                <div v-for="(player, index) in players" :key="index" class="player-card"
+                    :class="{ active: currentPlayerIndex === index && gameState !== 'lobby' }">
+
+                    <div class="player-header">
+                        <!-- Klik op naam = FORCEER BEURT -->
+                        <span class="player-name" @click="forceTurn(index)" title="Geef beurt aan deze speler"
+                            role="button" tabindex="0">
+                            {{ player.name }}
+                        </span>
+                        <!-- Klik op score = BEWERKEN -->
+                        <span class="player-score" @click="editScore(index)" title="Klik om score aan te passen"
+                            role="button" tabindex="0">
+                            {{ player.score }}
+                        </span>
+                    </div>
+
+                    <div class="streak-bar" v-if="gameState !== 'lobby' && currentPlayerIndex === index">
+                        <div class="streak-dot" :class="{ filled: currentStreak >= 1 }"></div>
+                        <div class="streak-dot" :class="{ filled: currentStreak >= 2 }"></div>
+                        <div class="streak-dot" :class="{ filled: currentStreak >= 3 }"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Debug info -->
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top:10px; text-align:center;">
+                Status: {{ gameState }} • Vragen: {{ questions.length }}
+            </div>
+
+            <div class="sidebar-footer">
+                <button class="icon-btn" @click="undoLastAction" title="Ongedaan maken">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button class="icon-btn" :class="{ active: showAdmin }" @click="openAdmin" title="Vragen Bewerken">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+                <button class="icon-btn" @click="showSettings = true" title="Instellingen">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+                <button class="icon-btn danger" @click="resetGame" title="Reset Spel">
+                    <i class="fa-solid fa-power-off"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- =====================
+         2. MAIN CONTENT (RECHTS)
+         ===================== -->
+        <main class="main-area">
+
+            <!-- Als we aan het spelen zijn -->
+            <div v-if="gameState === 'playing' || gameState === 'steal'" class="game-wrapper">
+                <div v-if="!currentQuestion" class="turn-indicator">
+                    <h2><span style="color: var(--primary);">{{ players[currentPlayerIndex].name }}</span> is aan de
+                        beurt</h2>
+                    <p>Kies een categorie en niveau</p>
+                </div>
+
+                <!-- Categorie Filter -->
+                <div v-if="!currentQuestion" class="category-filter">
+                    <div class="cat-chip" :class="{ active: selectedCategory === 'Alles' }"
+                        @click="selectedCategory = 'Alles'" role="button" tabindex="0">
+                        Alles
+                    </div>
+                    <div v-for="cat in uniqueCategories" :key="cat" class="cat-chip"
+                        :class="{ active: selectedCategory === cat }" @click="selectedCategory = cat" role="button"
+                        tabindex="0">
+                        {{ cat }}
+                    </div>
+                </div>
+
+                <!-- Level Grid -->
+                <div v-if="!currentQuestion" class="grid-levels">
+                    <button v-for="lvl in 10" :key="lvl" class="level-btn" @click="selectQuestion(lvl)">
+                        {{ lvl }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Fallback als er niets te zien is -->
+            <div v-if="gameState === 'lobby' && !players.length"
+                style="display:flex; height:100%; align-items:center; justify-content:center; opacity:0.3; font-size:2rem; font-weight:800; color:white;">
+                SAMMIE QUIZ
+            </div>
+
+        </main>
+
+        <!-- =====================
+         3. POPUPS & OVERLAYS
+         (Buiten main geplaatst voor zekerheid)
+         ===================== -->
+
+        <!-- LOBBY / START SCHERM -->
+        <div v-if="gameState === 'lobby'" class="backdrop">
+            <div class="modal" style="max-width: 500px;">
+                <div class="modal-content">
+                    <img src="./assets/sammie.png" alt="Sammie" style="width: 200px; margin-bottom: 20px;">
+                    <h2>Welkom bij SammieQuiz</h2>
+                    <p class="text-muted mb-20">Voeg spelers toe om te beginnen.</p>
+
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <input type="text" v-model="newPlayerName" @keyup.enter="addPlayer" placeholder="Naam speler..."
+                            autofocus>
+                        <button @click="addPlayer" class="btn btn-primary" style="width: auto;">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+
+                    <div v-if="players.length > 0" class="mb-20" style="text-align: left;">
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            <span v-for="(p, i) in players" :key="i"
+                                style="background:rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 4px; font-size: 0.9rem;">
+                                {{ p.name }} <i class="fa-solid fa-xmark" @click="players.splice(i,1)"
+                                    style="cursor: pointer; margin-left: 5px; color: var(--danger);"></i>
+                            </span>
+                        </div>
+                    </div>
+
+                    <button v-if="players.length > 0" @click="startGame" class="btn btn-primary btn-block">
+                        START QUIZ 🚀
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VRAAG KAART -->
+        <div v-if="currentQuestion" class="backdrop">
+            <div class="modal" :class="{ 'shake-anim': isShaking }">
+
+                <div v-if="settings.timerEnabled && !isFlipped" class="timer-container">
+                    <div class="timer-fill" :class="{ danger: timerVal < 10 }"
+                        :style="{ width: (timerVal / settings.timerDuration * 100) + '%' }"></div>
+                </div>
+
+                <div v-if="gameState === 'steal'" class="steal-banner">
+                    🚨 STEAL KANS: {{ players[currentPlayerIndex].name }}
+                </div>
+
+                <div class="modal-content">
+                    <div style="position:absolute; top:15px; right:15px; cursor:pointer; color:var(--text-muted);"
+                        @click="openEditCurrentQuestion" title="Fout in vraag? Pas aan">
+                        <i class="fa-solid fa-pen"></i>
+                    </div>
+
+                    <span class="category-tag">{{ currentQuestion.category }} • Niveau {{ currentQuestion.difficulty
+                        }}</span>
+
+                    <div class="question-text">{{ currentQuestion.question }}</div>
+
+                    <div v-if="!isFlipped">
+                        <button @click="revealAnswer" class="btn btn-primary">
+                            <i class="fa-solid fa-eye"></i> Toon Antwoord (Spatie)
+                        </button>
+                    </div>
+
+                    <div v-else>
+                        <div class="answer-display">
+                            <div class="answer-main">{{ currentQuestion.answer }}</div>
+                            <div v-if="currentQuestion.answers && currentQuestion.answers.length > 0"
+                                class="answer-sub">
+                                Ook goed: {{ currentQuestion.answers.join(', ') }}
+                            </div>
+                        </div>
+
+                        <div class="btn-row">
+                            <button @click="handleResult(false)" class="btn btn-danger">
+                                <i class="fa-solid fa-xmark"></i> FOUT (←)
+                            </button>
+                            <button @click="handleResult(true)" class="btn btn-success">
+                                <i class="fa-solid fa-check"></i> GOED (→)
+                            </button>
+                        </div>
+
+                        <div style="margin-top: 20px;">
+                            <button @click="currentQuestion = null" class="btn btn-sm"
+                                style="background:transparent; color:var(--text-muted);">
+                                Sluit kaart (geen punten)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADMIN / VRAGEN BEHEER -->
+        <div v-if="showAdmin" class="backdrop" @click.self="showAdmin = false">
+            <div class="modal large">
+                <div class="modal-header">
+                    <h2><i class="fa-solid fa-database"></i> Vragen Beheer</h2>
+                    <button class="close-btn" @click="showAdmin = false">&times;</button>
+                </div>
+
+                <div v-if="editingQuestion" class="edit-form">
+                    <h3 class="mb-20">{{ editingQuestion.id ? 'Vraag Bewerken' : 'Nieuwe Vraag' }}</h3>
+                    <div class="form-group">
+                        <label>Vraag</label>
+                        <textarea v-model="editingQuestion.question"></textarea>
+                    </div>
+                    <div class="flex-gap">
+                        <div class="form-group w-100">
+                            <label>Antwoord</label>
+                            <input type="text" v-model="editingQuestion.answer">
+                        </div>
+                        <div class="form-group w-100">
+                            <label>Categorie</label>
+                            <input type="text" v-model="editingQuestion.category" list="catList">
+                            <datalist id="catList">
+                                <option v-for="c in uniqueCategories" :value="c"></option>
+                            </datalist>
+                        </div>
+                    </div>
+                    <div class="flex-gap">
+                        <div class="form-group w-100">
+                            <label>Niveau (1-10)</label>
+                            <input type="number" v-model.number="editingQuestion.difficulty" min="1" max="10">
+                        </div>
+                        <div class="form-group w-100">
+                            <label>Alternatieven (komma gescheiden)</label>
+                            <input type="text" v-model="altAnswersStr">
+                        </div>
+                    </div>
+
+                    <div class="btn-row" style="justify-content: flex-end;">
+                        <button @click="cancelEdit" class="btn">Annuleren</button>
+                        <button @click="saveEdit" class="btn btn-success">Opslaan</button>
+                    </div>
+                </div>
+
+                <div v-else class="modal-content" style="padding:0; display:flex; flex-direction:column; height:100%;">
+                    <div class="admin-toolbar">
+                        <input type="text" v-model="adminSearch" placeholder="Zoek vraag...">
+                        <button @click="startNewQuestion" class="btn btn-primary btn-sm"><i
+                                class="fa-solid fa-plus"></i> Nieuw</button>
+                        <button @click="exportData" class="btn btn-sm" title="Exporteer JSON"><i
+                                class="fa-solid fa-download"></i></button>
+                    </div>
+                    <div class="admin-body">
+                        <div class="question-list">
+                            <div v-for="q in filteredAdminQuestions" :key="q.id" class="q-item">
+                                <div class="q-info">
+                                    <h4>{{ q.question }}</h4>
+                                    <div class="q-meta">
+                                        <span style="color:var(--accent-cyan)">{{ q.category }}</span> •
+                                        Lvl {{ q.difficulty }} •
+                                        <span style="color:var(--success)">{{ q.answer }}</span>
+                                    </div>
+                                </div>
+                                <div class="q-actions">
+                                    <button @click="startEdit(q)" class="icon-btn"><i
+                                            class="fa-solid fa-pen"></i></button>
+                                    <button @click="deleteQuestion(q.id)" class="icon-btn danger"><i
+                                            class="fa-solid fa-trash"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- INSTELLINGEN -->
+        <div v-if="showSettings" class="backdrop" @click.self="showSettings = false">
+            <div class="modal" style="max-width: 400px;">
+                <div class="modal-content" style="text-align: left;">
+                    <h2 class="mb-20">Instellingen</h2>
+                    <div class="mb-20">
+                        <label class="text-muted">Punten om te winnen</label>
+                        <input type="number" v-model="winningScore">
+                    </div>
+                    <div class="mb-20" style="display: flex; justify-content: space-between;">
+                        <label>Geluidseffecten</label>
+                        <input type="checkbox" v-model="settings.soundEnabled">
+                    </div>
+                    <div class="mb-20" style="display: flex; justify-content: space-between;">
+                        <label>Timer gebruiken</label>
+                        <input type="checkbox" v-model="settings.timerEnabled">
+                    </div>
+                    <div v-if="settings.timerEnabled" class="mb-20">
+                        <label class="text-muted">Seconden per vraag</label>
+                        <input type="number" v-model="settings.timerDuration">
+                    </div>
+                    <div class="mb-20" style="display: flex; justify-content: space-between;">
+                        <label>Steal Modus (3+ spelers)</label>
+                        <input type="checkbox" v-model="settings.allowSteal">
+                    </div>
+                    <div class="mb-20">
+                        <button @click="resetUsedQuestions" class="btn btn-sm w-100">
+                            <i class="fa-solid fa-rotate"></i> Reset "Al geweest" geheugen
+                        </button>
+                    </div>
+                    <button @click="showSettings = false" class="btn btn-primary w-100">Sluiten</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- WINNAAR -->
+        <div v-if="gameState === 'winner'" class="backdrop">
+            <div class="modal" style="text-align: center;">
+                <div class="modal-content">
+                    <i class="fa-solid fa-trophy" style="font-size: 5rem; color: var(--gold); margin-bottom: 20px;"></i>
+                    <h1 style="margin: 0;">{{ winner.name }}</h1>
+                    <h3 class="text-muted mb-20">heeft gewonnen!</h3>
+                    <div style="font-size: 2rem; font-weight: 800; margin-bottom: 30px;">
+                        {{ winner.score }} Punten
+                    </div>
+                    <button @click="resetGame" class="btn btn-primary">Opnieuw Spelen</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+
+</html>

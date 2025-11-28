@@ -1,0 +1,53 @@
+deze prompt kan je gebruiken om vragen te genereren voor een quiz. 
+
+moet niet gebruikt worden als code
+
+prompt:
+Ik ben een quiz-applicatie aan het bouwen en heb jouw hulp nodig als expert quizmaster en content creator. Je taak is het genereren van een batch nieuwe quizvragen in JSON-formaat.
+
+Hier zijn de strikte instructies:
+
+1. DOELGROEP & STIJL:
+- Publiek: Vlamingen, voornamelijk mannen tussen 30 en 50 jaar.
+- Niveau: Denk aan 'De Slimste Mens ter Wereld', 'Blokken' of een goede caféquiz.
+- Toon: Interessant, niet te droog, origineel. Vermijd te generieke "schoolvragen".
+- Regio: Focus op internationale kennis en Vlaamse cultuur/media. 
+- VERBODEN: Geen specifieke vragen over Nederland (geen BN'ers, geen Nederlandse TV-programma's, geen Nederlandse politiek), tenzij het wereldnieuws is.
+
+2. CATEGORIEËN & SPREIDING:
+De vragen MOETEN gelijkmatig verdeeld worden over deze 6 categorieën (dus bij 50 vragen ongeveer 8 à 9 vragen per categorie):
+- Aardrijkskunde (geo)
+- Geschiedenis (hist)
+- Amusement (ent)
+- Wetenschap & Natuur (sci)
+- Sport & Spel (sport)
+- Kunst & Literatuur (art)
+
+3. FORMAT & TECHNISCHE EISEN:
+- Output moet een geldige JSON-lijst zijn (alleen de array met objecten).
+- Gebruik de structuur zoals in het voorbeeld hieronder.
+- 'acceptedAnswers': Geef hierin variaties (bijnamen, Engelse titels, veelgemaakte spelfouten, achternamen).
+- 'id': Gebruik het format "[categorie_afkorting]_[nummer]". 
+
+4. HUIDIGE OPDRACHT:
+- Aantal vragen: [AANTAL VRAGEN, BV: 50]
+- Moeilijkheidsgraad (1-10): [NIVEAU, BV: 6]
+- Startnummer voor ID's: [STARTNUMMER, BV: 10400]
+
+VOORBEELD STRUCTUUR:
+[
+    {
+        "id": "hist_10400",
+        "category": "Geschiedenis",
+        "difficulty": 6,
+        "question": "Welke Oostenrijkse aartshertog werd in 1914 vermoord in Sarajevo?",
+        "answer": "Frans Ferdinand",
+        "acceptedAnswers": [
+            "Franz Ferdinand",
+            "Frans Ferdinand",
+            "Aartshertog Frans Ferdinand"
+        ]
+    }
+]
+
+Genereer nu de gevraagde batch vragen met een perfecte spreiding over de categorieën.
